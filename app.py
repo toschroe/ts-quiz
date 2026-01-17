@@ -45,7 +45,20 @@ st.markdown(f"""
         margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }}
-
+    /* Erzwingt, dass Spalten auf Mobile nebeneinander bleiben */
+    [data-testid="column"] {{
+        width: 48% !important;
+        flex: 1 1 48% !important;
+        min-width: 48% !important;
+    }}
+    
+    /* Zusätzlicher Abstand für die Button-Reihe */
+    .stHorizontalBlock {{
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 10px;
+    }}
     /* EXPLIZITER FIX FÜR BUTTONS */
     .stButton > button {{
         width: 100%;
