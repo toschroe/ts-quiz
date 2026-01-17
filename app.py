@@ -43,6 +43,7 @@ st.markdown(f"""
         background-color: {t['card_bg']} !important;
         color: {t['text']} !important;
         height: 3.5em !important;
+        margin-bottom: 5px !important;
     }}
     .stMarkdown, p, span, label {{ color: {t['text']} !important; }}
     </style>
@@ -61,7 +62,6 @@ if os.path.exists(BASE_DIR):
         if quiz_file:
             df = pd.read_csv(os.path.join(path, quiz_file))
             
-            # Reset Order bei neuem Quiz oder Shuffle-Wechsel
             if not st.session_state.order or len(st.session_state.order) != len(df):
                 st.session_state.order = list(range(len(df)))
                 if shuffle: random.shuffle(st.session_state.order)
@@ -86,7 +86,7 @@ if os.path.exists(BASE_DIR):
             if st.session_state.reveal:
                 st.info(f"**Antwort:** {a}")
                 
-            # 4. NAVIGATION UNTEN (Statisch)
+            # 4. NAVIGATION UNTEN
             st.write("---") 
             if st.button("⬅️ Zurück (1 Karte)"):
                 st.session_state.idx = (st.session_state.idx - 1) % len(df)
@@ -95,5 +95,10 @@ if os.path.exists(BASE_DIR):
             
             if st.button("⏪ 10 Karten zurück"):
                 st.session_state.idx = (st.session_state.idx - 10) % len(df)
+                st.session_state.reveal = False
+                st.rerun()
+
+            if st.button("🏠 Auf Anfang"):
+                st.session_state.idx = 0
                 st.session_state.reveal = False
                 st.rerun()
