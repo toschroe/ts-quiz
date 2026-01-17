@@ -57,7 +57,36 @@ st.markdown(f"""
         font-size: {1.4 * scale}rem; margin-top: 10px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }}
-    
+/* HAUPTCONTAINER OPTIMIERUNG */
+    [data-testid="stAppViewBlockContainer"] {{
+        padding-top: 1.5rem !important; /* Reduziert den riesigen Freiraum oben */
+        padding-bottom: 6rem !important; /* Schafft Platz unten für den Antwort-Knopf */
+        max-width: 100% !important;
+    }}
+
+    /* NAVIGATION OBEN FIX */
+    [data-testid="stHorizontalBlock"] {{
+        margin-bottom: 10px !important;
+    }}
+
+    /* KARTEN-ANPASSUNG */
+    .card {{
+        margin-top: 0px !important;
+        margin-bottom: 15px !important;
+        padding: {20 * scale}px !important;
+    }}
+
+    /* MEDIA QUERY FÜR HANDY-SPEZIFISCHE FEINHEITEN */
+    @media (max-width: 600px) {{
+        .stTitle {{
+            font-size: 1.8rem !important;
+            padding-bottom: 0px !important;
+        }}
+        [data-testid="stAppViewBlockContainer"] {{
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }}
+    }}    
     .stMarkdown, p, span, label {{ color: {t['text']} !important; }}
     </style>
 """, unsafe_allow_html=True)
