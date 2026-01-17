@@ -12,12 +12,13 @@ if 'order' not in st.session_state: st.session_state.order = []
 if 'last_path' not in st.session_state: st.session_state.last_path = ""
 if 'last_shuffle' not in st.session_state: st.session_state.last_shuffle = False
 
-# Hilfsfunktion für den harten Reset
+# Hilfsfunktionen für den Reset
 def full_reset():
     st.session_state.idx = 0
     st.session_state.reveal = False
     st.session_state.order = []
-    st.session_state.last_path = "" # Erzwingt Neu-Einlesen der CSV
+    st.session_state.last_path = "" # Erzwingt kompletten Reload
+    st.session_state.last_shuffle = not st.session_state.last_shuffle # Provokation für Sync-Block
 
 def soft_reset():
     st.session_state.idx = 0
@@ -50,7 +51,7 @@ with col_mix:
         st.rerun()
 with col_refresh:
     if st.button("🔄 Auffrischen"):
-        full_reset() # Löscht Pfad-Cache, erzwingt Reload
+        full_reset()
         st.rerun()
 
 st.session_state.font_scale = st.sidebar.slider("Schriftgröße (%)", 50, 150, st.session_state.font_scale, 5)
@@ -138,7 +139,7 @@ if os.path.exists(BASE_DIR):
                 df = pd.read_csv(full_path)
                 num_cards = len(df)
 
-                # SYNCHRONISATION
+                # SYNCHRONISATION (Verschärft)
                 if (st.session_state.last_path != full_path or 
                     st.session_state.last_shuffle != shuffle_mode or 
                     not st.session_state.order or 
@@ -152,7 +153,7 @@ if os.path.exists(BASE_DIR):
                     st.session_state.last_path = full_path
                     st.session_state.last_shuffle = shuffle_mode
                     st.session_state.reveal = False
-                    st.rerun()
+                    st.rerun() # Sofortiger Neustart mit neuen Daten
                 
                 # UI Anzeige
                 st.progress((st.session_state.idx + 1) / num_cards)
