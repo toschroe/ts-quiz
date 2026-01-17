@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import random
+import streamlit.components.v1 as components
 
 # --- INITIALISIERUNG ---
 if 'idx' not in st.session_state: st.session_state.idx = 0
@@ -9,11 +10,11 @@ if 'reveal' not in st.session_state: st.session_state.reveal = False
 if 'font_scale' not in st.session_state: st.session_state.font_scale = 100
 if 'order' not in st.session_state: st.session_state.order = []
 if 'last_quiz' not in st.session_state: st.session_state.last_quiz = ""
+if 'last_shuffle' not in st.session_state: st.session_state.last_shuffle = False
 
 # --- SIDEBAR: DESIGN & LOGIK ---
 st.sidebar.title("🎨 Design & Logik")
 
-# Theme-Definitionen
 themes = {
     "Hell (NotebookLM)": {"bg": "#ffffff", "sidebar": "#f8f9fa", "card_bg": "#fdfdfd", "text": "#1a1a1a", "border": "#eeeeee"},
     "Dunkel": {"bg": "#0e1117", "sidebar": "#161b22", "card_bg": "#1d2127", "text": "#fafafa", "border": "#31353f"},
@@ -22,10 +23,9 @@ themes = {
 selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()))
 t = themes[selected_theme]
 
-# Shuffle-Steuerung
-shuffle_mode = st.sidebar.checkbox("Zufällige Reihenfolge", value=False)
+shuffle_mode = st.sidebar.checkbox("Zufällige Reihenfolge", value=st.session_state.last_shuffle)
 if st.sidebar.button("🎲 Neu Mischen"):
-    st.session_state.order = [] # Erzwingt Neu-Generierung
+    st.session_state.order = []
     st.session_state.idx = 0
     st.rerun()
 
@@ -35,28 +35,11 @@ scale = st.session_state.font_scale / 100.0
 # --- CSS: VOLLSTÄNDIGE INTEGRATION ---
 st.markdown(f"""
     <style>
-    /* Haupt-App & Sidebar Hintergrund */
     .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
-    [data-testid="stSidebar"] {{ 
-        background-color: {t['sidebar']} !important; 
-        border-right: 1px solid {t['border']};
-    }}
-    
-    /* Text-Farben in der Sidebar erzwingen */
-    [data-testid="stSidebar"] .stMarkdown, 
-    [data-testid="stSidebar"] p, 
-    [data-testid="stSidebar"] span, 
-    [data-testid="stSidebar"] label {{ 
-        color: {t['text']} !important; 
-    }}
+    [data-testid="stSidebar"] {{ background-color: {t['sidebar']} !important; border-right: 1px solid {t['border']}; }}
+    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {{ color: {t['text']} !important; }}
+    [data-testid="stAppViewBlockContainer"] {{ padding-top: 2rem !important; padding-bottom: 6rem !important; }}
 
-    /* Container-Abstände */
-    [data-testid="stAppViewBlockContainer"] {{ 
-        padding-top: 2rem !important; 
-        padding-bottom: 6rem !important; 
-    }}
-
-    /* Die Karte */
     .card {{ 
         padding: {25 * scale}px; border-radius: 20px; 
         background: {t['card_bg']}; color: {t['text']};
@@ -67,7 +50,6 @@ st.markdown(f"""
         display: flex; align-items: center; justify-content: center;
     }}
 
-    /* Button-Design (Main & Sidebar) */
     .stButton > button {{
         width: 100% !important; border-radius: 12px !important;
         border: 1px solid {t['border']} !important;
@@ -77,17 +59,37 @@ st.markdown(f"""
         margin-bottom: 5px !important;
     }}
     
-    /* Verhindert das Verschwinden der Header-Icons */
-    header[data-testid="stHeader"] {{
-        background-color: transparent !important;
-    }}
-    header[data-testid="stHeader"] svg {{
-        fill: {t['text']} !important;
-    }}
-
+    header[data-testid="stHeader"] {{ background-color: transparent !important; }}
+    header[data-testid="stHeader"] svg {{ fill: {t['text']} !important; }}
     .stMarkdown, p, span, label, .stCaption {{ color: {t['text']} !important; }}
     </style>
 """, unsafe_allow_html=True)
+
+# --- KEYBOARD SHORTCUTS (JAVASCRIPT HACK) ---
+# Dieser Block hört auf Tastendrücke und simuliert Klicks auf die Buttons
+components.html(
+    f"""
+    <script>
+    const doc = window.parent.document;
+    doc.addEventListener('keydown', function(e) {{
+        if (e.key === 'Enter' || e.code === 'Space') {{
+            e.preventDefault();
+            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Antwort prüfen'));
+            if (btn) btn.click();
+        }} else if (e.key === 'ArrowRight') {{
+            e.preventDefault();
+            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Weiter mit'));
+            if (btn) btn.click();
+        }} else if (e.key === 'ArrowLeft') {{
+            e.preventDefault();
+            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Zurück (1 Karte)'));
+            if (btn) btn.click();
+        }}
+    }});
+    </script>
+    """,
+    height=0,
+)
 
 # --- INHALT LADEN ---
 BASE_DIR = "Quizzes"
@@ -100,26 +102,27 @@ if os.path.exists(BASE_DIR):
         quiz_file = st.sidebar.selectbox("Quiz", files)
         
         if quiz_file:
-            # Dateiname ohne Endung für die Button-Beschriftung
             quiz_name_clean = os.path.splitext(quiz_file)[0].replace('_', ' ')
-            
-            # Daten laden
             df = pd.read_csv(os.path.join(path, quiz_file))
             num_cards = len(df)
 
-            # Reset bei Quiz-Wechsel oder leerer Order
-            if st.session_state.last_quiz != quiz_file or not st.session_state.order or len(st.session_state.order) != num_cards:
+            if (st.session_state.last_quiz != quiz_file or 
+                st.session_state.last_shuffle != shuffle_mode or 
+                not st.session_state.order or 
+                len(st.session_state.order) != num_cards):
+                
                 st.session_state.order = list(range(num_cards))
                 if shuffle_mode:
                     random.shuffle(st.session_state.order)
+                
                 st.session_state.idx = 0
                 st.session_state.last_quiz = quiz_file
+                st.session_state.last_shuffle = shuffle_mode
+                st.session_state.reveal = False
                 st.rerun()
             
-            # Fortschritt
-            progress_val = (st.session_state.idx + 1) / num_cards
-            st.progress(progress_val)
-            st.caption(f"Karte {st.session_state.idx + 1} von {num_cards}")
+            st.progress((st.session_state.idx + 1) / num_cards)
+            st.caption(f"Karte {st.session_state.idx + 1} von {num_cards} | ⌨️ [Enter/Space]: Antwort | [→]: Weiter | [←]: Zurück")
 
             # 1. NAVIGATION OBEN
             if st.button(f"Weiter mit {quiz_name_clean} ➡️"):
