@@ -38,9 +38,10 @@ def get_quiz_structure(base_path="Quizzes"):
     if not os.path.exists(base_path):
         os.makedirs(base_path)
         # Dummy Daten für den ersten Start
-        os.makedirs(f"{base_path}/Beispiel")
-        df = pd.DataFrame([["Was ist 2+2?", "4"], ["Hauptstadt von DE?", "Berlin"]])
-        df.to_csv(f"{base_path}/Beispiel/Demo.csv", index=False, header=False)
+        if not os.path.exists(f"{base_path}/Beispiel"):
+            os.makedirs(f"{base_path}/Beispiel")
+            df = pd.DataFrame([["Was ist 2+2?", "4"], ["Hauptstadt von DE?", "Berlin"]])
+            df.to_csv(f"{base_path}/Beispiel/Demo.csv", index=False, header=False)
 
     categories = sorted([d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))])
     structure = {}
@@ -53,14 +54,10 @@ def get_quiz_structure(base_path="Quizzes"):
 
 @st.cache_data
 def load_csv(path):
-    """
-    Lädt eine CSV-Datei. Durch das Caching und die Zuweisung im Main-Scope
-    werden alte Referenzen bei einem Neuaufruf automatisch überschrieben
-    und der Speicher für die neue Datei freigegeben.
-    """
+    """Lädt eine CSV-Datei."""
+    if not path or not os.path.exists(path):
+        return [["Keine Daten", "Bitte wähle ein Quiz aus"]]
     try:
-        # Wir erzwingen hier kein "global clear", da Python's Garbage Collection
-        # die alte Liste löscht, sobald die Variable im Session State neu zugewiesen wird.
         df = pd.read_csv(path, header=None, names=["Frage", "Antwort"])
         return df.values.tolist()
     except Exception as e:
@@ -81,12 +78,11 @@ if 'shuffle' not in st.session_state:
 if 'order' not in st.session_state:
     st.session_state.order = []
 if 'last_path' not in st.session_state:
-    st.session_state.last_path = ""
+    st.session_state.last_path = None
 
-# --- LOGIK ---
+# --- SIDEBAR & LOGIK ---
 quiz_structure = get_quiz_structure()
 
-# Sidebar Navigation
 with st.sidebar:
     st.title("Settings")
 
@@ -100,55 +96,60 @@ with st.sidebar:
     file_list = quiz_structure[selected_cat]
     selected_file = st.selectbox("Quiz-Datei", file_list)
 
-    full_path = os.path.join("Quizzes", selected_cat, selected_file)
+    current_full_path = os.path.join("Quizzes", selected_cat, selected_file)
 
-    # State Reset bei Dateiwechsel
-    if full_path != st.session_state.last_path:
-        st.session_state.last_path = full_path
-        data = load_csv(full_path)
-        st.session_state.order = list(range(len(data)))
+    # Synchronisations-Logik: Reset bei Dateiwechsel
+    if current_full_path != st.session_state.last_path:
+        st.session_state.last_path = current_full_path
+        data_preview = load_csv(current_full_path)
+        st.session_state.order = list(range(len(data_preview)))
         if st.session_state.shuffle:
             random.shuffle(st.session_state.order)
         st.session_state.idx = 0
         st.session_state.reveal = False
-        st.rerun()
 
     st.divider()
 
-    # Shuffle & Reset
     new_shuffle = st.toggle("Shuffle Modus", value=st.session_state.shuffle)
     if new_shuffle != st.session_state.shuffle:
         st.session_state.shuffle = new_shuffle
-        data = load_csv(full_path)
-        st.session_state.order = list(range(len(data)))
+        st.session_state.idx = 0
+        st.session_state.reveal = False
+        data_for_shuffle = load_csv(current_full_path)
+        st.session_state.order = list(range(len(data_for_shuffle)))
         if new_shuffle:
             random.shuffle(st.session_state.order)
-        st.session_state.idx = 0
         st.rerun()
 
     if st.button("🔄 Neu Mischen"):
         random.shuffle(st.session_state.order)
         st.session_state.idx = 0
+        st.session_state.reveal = False
         st.rerun()
 
     if st.button("🔥 Auffrischen (Hard Reset)"):
-        # Löscht den gesamten Cache und zwingt zum Neulesen aller Dateien
         st.cache_data.clear()
-        # Setzt den Pfad zurück, um ein Neu-Triggering der Ladelogik zu erzwingen
-        st.session_state.last_path = ""
+        st.session_state.last_path = None
         st.rerun()
 
     st.divider()
 
-    # Theme & Font
     st.session_state.theme = st.radio("Theme", list(THEMES.keys()))
     st.session_state.font_scale = st.slider("Schriftgröße", 0.8, 2.5, 1.2)
 
-# Daten laden
-current_data = load_csv(st.session_state.last_path)
+# --- DATEN FÜR DIE ANZEIGE ---
+current_data = load_csv(current_full_path)
 total_cards = len(st.session_state.order)
 
-# Validierung der Index-Sicherheit (falls Datei kleiner wurde)
+if total_cards == 0:
+    st.error("Diese Datei scheint leer zu sein oder konnte nicht korrekt indiziert werden.")
+    st.stop()
+
+if len(st.session_state.order) != len(current_data):
+    st.session_state.order = list(range(len(current_data)))
+    if st.session_state.shuffle:
+        random.shuffle(st.session_state.order)
+
 if st.session_state.idx >= total_cards:
     st.session_state.idx = 0
 
@@ -161,18 +162,14 @@ font_size = 20 * st.session_state.font_scale
 
 st.markdown(f"""
     <style>
-    /* Viewport Optimierung */
     .block-container {{
         padding-top: 2rem !important;
         padding-bottom: 5rem !important;
         background-color: {t['bg']};
     }}
-
     [data-testid="stSidebar"] {{
         background-color: {t['sidebar']};
     }}
-
-    /* Card Design */
     .flashcard {{
         background-color: {t['card_bg']};
         color: {t['text']};
@@ -186,16 +183,14 @@ st.markdown(f"""
         align-items: center;
         text-align: center;
         border: 1px solid rgba(128,128,128,0.1);
-        margin: 2rem 0;
-        transition: all 0.3s ease;
+        margin-top: 2rem;
+        margin-bottom: 2rem;
     }}
-
     .question-text {{
         font-size: {font_size}px;
         font-weight: 600;
         line-height: 1.4;
     }}
-
     .answer-box {{
         background-color: {t['accent']}22;
         border-left: 5px solid {t['accent']};
@@ -206,8 +201,6 @@ st.markdown(f"""
         color: {t['text']};
         font-size: {font_size * 0.9}px;
     }}
-
-    /* Buttons Scaling */
     .stButton>button {{
         width: 100%;
         border-radius: 12px;
@@ -228,23 +221,19 @@ def back_10():
     st.session_state.idx = (st.session_state.idx - 10) % total_cards
     st.session_state.reveal = False
 
-def reset_idx():
-    st.session_state.idx = 0
-    st.session_state.reveal = False
-
 def toggle_reveal():
     st.session_state.reveal = not st.session_state.reveal
 
 # --- MAIN UI ---
+clean_name = selected_file.replace('.csv', '')
+
 # Top Navigation
 cols_top = st.columns([1, 2, 1])
 with cols_top[1]:
-    clean_name = selected_file.replace('.csv', '')
     if st.button(f"Weiter mit **{clean_name}** ➡️", key="next_top", use_container_width=True):
         next_card()
         st.rerun()
 
-# Progress
 progress = (st.session_state.idx + 1) / total_cards
 st.progress(progress)
 st.caption(f"Karte {st.session_state.idx + 1} von {total_cards} • {selected_file}")
@@ -282,10 +271,11 @@ with cols_bot[1]:
         st.rerun()
 with cols_bot[2]:
     if st.button("🏠 Auf Anfang", key="reset_btn"):
-        reset_idx()
+        st.session_state.idx = 0
+        st.session_state.reveal = False
         st.rerun()
 
-# --- KEYBOARD SHORTCUTS (JavaScript) ---
+# Keyboard Shortcuts
 st.components.v1.html(f"""
     <script>
     const doc = window.parent.document;
