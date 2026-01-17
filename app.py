@@ -4,8 +4,13 @@ import os
 import random
 
 # --- KONFIGURATION & THEMES ---
-st.set_page_config(page_title="Flashcard Pro", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="Flashcard Pro",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
+# Design-Tokens für die NotebookLM-Ästhetik
 THEMES = {
     "Hell": {
         "bg": "#f8f9fa",
@@ -34,14 +39,9 @@ THEMES = {
 
 @st.cache_data
 def get_quiz_structure(base_path="Quizzes"):
-    """Liest die Ordnerstruktur und CSV-Dateien alphabetisch ein."""
+    """Scannt das Verzeichnis alphabetisch nach Kategorien und Dateien."""
     if not os.path.exists(base_path):
         os.makedirs(base_path)
-        # Dummy Daten für den ersten Start
-        if not os.path.exists(f"{base_path}/Beispiel"):
-            os.makedirs(f"{base_path}/Beispiel")
-            df = pd.DataFrame([["Was ist 2+2?", "4"], ["Hauptstadt von DE?", "Berlin"]])
-            df.to_csv(f"{base_path}/Beispiel/Demo.csv", index=False, header=False)
 
     categories = sorted([d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))])
     structure = {}
@@ -53,56 +53,46 @@ def get_quiz_structure(base_path="Quizzes"):
     return structure
 
 @st.cache_data
-def load_csv(path):
-    """Lädt eine CSV-Datei."""
+def load_csv_data(path):
+    """Lädt CSV-Inhalte (Frage in Spalte 1, Antwort in Spalte 2)."""
     if not path or not os.path.exists(path):
-        return [["Keine Daten", "Bitte wähle ein Quiz aus"]]
+        return [["Keine Daten", "Bitte Datei auswählen"]]
     try:
+        # Einlesen ohne Header für maximale Flexibilität
         df = pd.read_csv(path, header=None, names=["Frage", "Antwort"])
         return df.values.tolist()
     except Exception as e:
-        st.error(f"Fehler beim Laden: {e}")
-        return [["Fehler", "Datei konnte nicht gelesen werden"]]
+        return [[f"Ladefehler", f"Die Datei konnte nicht gelesen werden: {e}"]]
 
 # --- SESSION STATE INITIALISIERUNG ---
-if 'idx' not in st.session_state:
-    st.session_state.idx = 0
-if 'reveal' not in st.session_state:
-    st.session_state.reveal = False
-if 'font_scale' not in st.session_state:
-    st.session_state.font_scale = 1.0
-if 'theme' not in st.session_state:
-    st.session_state.theme = "Hell"
-if 'shuffle' not in st.session_state:
-    st.session_state.shuffle = False
-if 'order' not in st.session_state:
-    st.session_state.order = []
-if 'last_path' not in st.session_state:
-    st.session_state.last_path = None
+if 'idx' not in st.session_state: st.session_state.idx = 0
+if 'reveal' not in st.session_state: st.session_state.reveal = False
+if 'font_scale' not in st.session_state: st.session_state.font_scale = 1.2
+if 'theme' not in st.session_state: st.session_state.theme = "Hell"
+if 'shuffle' not in st.session_state: st.session_state.shuffle = False
+if 'order' not in st.session_state: st.session_state.order = []
+if 'last_path' not in st.session_state: st.session_state.last_path = None
 
-# --- SIDEBAR & LOGIK ---
+# --- SIDEBAR LOGIK ---
 quiz_structure = get_quiz_structure()
 
 with st.sidebar:
-    st.title("Settings")
+    st.title("NotebookLM Quiz")
 
     if not quiz_structure:
-        st.warning("Keine Quizzes gefunden. Bitte 'Quizzes/' Ordner füllen.")
+        st.info("Erstelle einen Ordner 'Quizzes/' mit Unterordnern und CSV-Dateien.")
         st.stop()
 
-    cat_list = list(quiz_structure.keys())
-    selected_cat = st.selectbox("Kategorie", cat_list)
+    # Auswahl-Kette
+    sel_cat = st.selectbox("Themenbereich", list(quiz_structure.keys()))
+    sel_file = st.selectbox("Datei auswählen", quiz_structure[sel_cat])
+    current_full_path = os.path.join("Quizzes", sel_cat, sel_file)
 
-    file_list = quiz_structure[selected_cat]
-    selected_file = st.selectbox("Quiz-Datei", file_list)
-
-    current_full_path = os.path.join("Quizzes", selected_cat, selected_file)
-
-    # Synchronisations-Logik: Reset bei Dateiwechsel
+    # Detektion von Quiz-Wechseln (Source of Truth Check)
     if current_full_path != st.session_state.last_path:
         st.session_state.last_path = current_full_path
-        data_preview = load_csv(current_full_path)
-        st.session_state.order = list(range(len(data_preview)))
+        raw_content = load_csv_data(current_full_path)
+        st.session_state.order = list(range(len(raw_content)))
         if st.session_state.shuffle:
             random.shuffle(st.session_state.order)
         st.session_state.idx = 0
@@ -110,188 +100,200 @@ with st.sidebar:
 
     st.divider()
 
-    new_shuffle = st.toggle("Shuffle Modus", value=st.session_state.shuffle)
-    if new_shuffle != st.session_state.shuffle:
-        st.session_state.shuffle = new_shuffle
+    # Steuerungs-Optionen
+    is_shuffle = st.toggle("Shuffle Modus", value=st.session_state.shuffle)
+    if is_shuffle != st.session_state.shuffle:
+        st.session_state.shuffle = is_shuffle
         st.session_state.idx = 0
-        st.session_state.reveal = False
-        data_for_shuffle = load_csv(current_full_path)
-        st.session_state.order = list(range(len(data_for_shuffle)))
-        if new_shuffle:
+        if is_shuffle:
             random.shuffle(st.session_state.order)
+        else:
+            st.session_state.order.sort()
         st.rerun()
 
-    if st.button("🔄 Neu Mischen"):
+    if st.button("🔄 Neu durchmischen"):
         random.shuffle(st.session_state.order)
         st.session_state.idx = 0
-        st.session_state.reveal = False
         st.rerun()
 
-    if st.button("🔥 Auffrischen (Hard Reset)"):
+    if st.button("🔥 Auffrischen (Cache Reset)"):
         st.cache_data.clear()
         st.session_state.last_path = None
         st.rerun()
 
     st.divider()
-
     st.session_state.theme = st.radio("Theme", list(THEMES.keys()))
     st.session_state.font_scale = st.slider("Schriftgröße", 0.8, 2.5, 1.2)
 
 # --- DATEN FÜR DIE ANZEIGE ---
-current_data = load_csv(current_full_path)
+current_data = load_csv_data(current_full_path)
 total_cards = len(st.session_state.order)
 
 if total_cards == 0:
-    st.error("Diese Datei scheint leer zu sein oder konnte nicht korrekt indiziert werden.")
+    st.warning("Dieses Quiz enthält keine gültigen Daten.")
     st.stop()
 
-if len(st.session_state.order) != len(current_data):
-    st.session_state.order = list(range(len(current_data)))
-    if st.session_state.shuffle:
-        random.shuffle(st.session_state.order)
-
+# Sicherstellen, dass der Index valide ist
 if st.session_state.idx >= total_cards:
     st.session_state.idx = 0
 
-current_card_idx = st.session_state.order[st.session_state.idx]
-question, answer = current_data[current_card_idx]
+current_card_pos = st.session_state.order[st.session_state.idx]
+question, answer = current_data[current_card_pos]
 
-# --- CSS INJECTION ---
+# --- RESPONSIVE CSS INJECTION ---
 t = THEMES[st.session_state.theme]
 font_size = 20 * st.session_state.font_scale
 
 st.markdown(f"""
     <style>
+    /* Globales Layout & NotebookLM Ästhetik */
     .block-container {{
-        padding-top: 2rem !important;
-        padding-bottom: 5rem !important;
         background-color: {t['bg']};
+        max-width: 900px;
+        margin: auto;
+        padding-top: 1.5rem !important;
+        padding-bottom: 6rem !important;
+        transition: all 0.3s ease;
     }}
+
     [data-testid="stSidebar"] {{
         background-color: {t['sidebar']};
     }}
+
+    /* Die Flashcard */
     .flashcard {{
         background-color: {t['card_bg']};
         color: {t['text']};
-        padding: 3rem;
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        min-height: 300px;
+        padding: 2.5rem;
+        border-radius: 28px;
+        box-shadow: 0 12px 45px rgba(0,0,0,0.1);
+        min-height: 350px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         text-align: center;
         border: 1px solid rgba(128,128,128,0.1);
-        margin-top: 2rem;
-        margin-bottom: 2rem;
+        margin: 1rem 0;
     }}
+
     .question-text {{
         font-size: {font_size}px;
         font-weight: 600;
         line-height: 1.4;
     }}
+
     .answer-box {{
-        background-color: {t['accent']}22;
-        border-left: 5px solid {t['accent']};
+        background-color: {t['accent']}15;
+        border-left: 6px solid {t['accent']};
         padding: 1.5rem;
-        margin-top: 2rem;
-        border-radius: 8px;
+        margin-top: 1.5rem;
+        border-radius: 12px;
         width: 100%;
         color: {t['text']};
         font-size: {font_size * 0.9}px;
+        animation: fadeIn 0.3s ease-out;
     }}
-    .stButton>button {{
-        width: 100%;
-        border-radius: 12px;
+
+    @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+
+    /* RESPONSIVE DESIGN */
+    @media (max-width: 640px) {{
+        .block-container {{ padding: 1rem !important; }}
+        .flashcard {{ min-height: 280px; padding: 1.5rem; }}
+        .question-text {{ font-size: {font_size * 0.8}px; }}
     }}
+
+    /* UI Fixes */
+    .stButton>button {{ width: 100%; border-radius: 12px; height: 3rem; }}
+    header[data-testid="stHeader"] {{ background: transparent !important; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- NAVIGATION LOGIK ---
-def next_card():
+# --- NAVIGATION FUNKTIONEN ---
+def go_next():
     st.session_state.idx = (st.session_state.idx + 1) % total_cards
     st.session_state.reveal = False
 
-def prev_card():
-    st.session_state.idx = (st.session_state.idx - 1) % total_cards
-    st.session_state.reveal = False
-
-def back_10():
-    st.session_state.idx = (st.session_state.idx - 10) % total_cards
-    st.session_state.reveal = False
-
-def toggle_reveal():
-    st.session_state.reveal = not st.session_state.reveal
-
 # --- MAIN UI ---
-clean_name = selected_file.replace('.csv', '')
+clean_name = sel_file.replace('.csv', '')
 
-# Top Navigation
-cols_top = st.columns([1, 2, 1])
-with cols_top[1]:
-    if st.button(f"Weiter mit **{clean_name}** ➡️", key="next_top", use_container_width=True):
-        next_card()
+# Obere Statuszeile
+meta_col, next_col = st.columns([1, 1])
+with meta_col:
+    st.caption(f"Karte {st.session_state.idx + 1} von {total_cards} • {clean_name}")
+with next_col:
+    if st.button(f"Weiter ➡️", key="btn_next_top"):
+        go_next()
         st.rerun()
 
-progress = (st.session_state.idx + 1) / total_cards
-st.progress(progress)
-st.caption(f"Karte {st.session_state.idx + 1} von {total_cards} • {selected_file}")
+st.progress((st.session_state.idx + 1) / total_cards)
 
-# Flashcard Area
+# Flashcard Bereich
 st.markdown(f"""
     <div class="flashcard">
         <div class="question-text">{question}</div>
     </div>
 """, unsafe_allow_html=True)
 
-# Reveal / Answer
-if st.button("Antwort einblenden / verbergen (Leertaste)", key="reveal_btn", type="primary"):
-    toggle_reveal()
+# Interaktion
+if st.button("Antwort einblenden / verbergen", type="primary", use_container_width=True):
+    st.session_state.reveal = not st.session_state.reveal
     st.rerun()
 
 if st.session_state.reveal:
     st.markdown(f"""
         <div class="answer-box">
-            <b>Antwort:</b><br>{answer}
+            <b>Lösung:</b><br>{answer}
         </div>
     """, unsafe_allow_html=True)
 
 st.divider()
 
-# Bottom Navigation
-cols_bot = st.columns(3)
-with cols_bot[0]:
-    if st.button("⬅️ Zurück", key="prev_btn"):
-        prev_card()
+# Untere Navigation (Adaptive Buttons)
+b1, b2, b3 = st.columns(3)
+with b1:
+    if st.button("⬅️ Zurück", use_container_width=True):
+        st.session_state.idx = (st.session_state.idx - 1) % total_cards
+        st.session_state.reveal = False
         st.rerun()
-with cols_bot[1]:
-    if st.button("⏪ 10 zurück", key="back10_btn"):
-        back_10()
+with b2:
+    if st.button("⏪ -10", use_container_width=True):
+        st.session_state.idx = (st.session_state.idx - 10) % total_cards
+        st.session_state.reveal = False
         st.rerun()
-with cols_bot[2]:
-    if st.button("🏠 Auf Anfang", key="reset_btn"):
+with b3:
+    if st.button("🏠 Start", use_container_width=True):
         st.session_state.idx = 0
         st.session_state.reveal = False
         st.rerun()
 
-# Keyboard Shortcuts
+# --- JAVASCRIPT BRIDGE (Shortcuts & Swipe) ---
 st.components.v1.html(f"""
     <script>
-    const doc = window.parent.document;
-    doc.addEventListener('keydown', function(e) {{
+    const p_doc = window.parent.document;
+
+    // Keyboard Listener
+    p_doc.addEventListener('keydown', (e) => {{
         if (e.key === 'ArrowRight') {{
-            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Weiter mit'));
-            if (btn) btn.click();
+            const b = Array.from(p_doc.querySelectorAll('button')).find(el => el.innerText.includes('Weiter'));
+            if (b) b.click();
         }}
-        if (e.key === 'ArrowLeft') {{
-            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Zurück'));
-            if (btn) btn.click();
-        }}
-        if (e.key === 'Enter' || e.key === ' ') {{
-            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Antwort einblenden'));
-            if (btn) btn.click();
+        if (e.key === ' ' || e.key === 'Enter') {{
+            const b = Array.from(p_doc.querySelectorAll('button')).find(el => el.innerText.includes('Antwort einblenden'));
+            if (b) b.click();
         }}
     }});
+
+    // Swipe Geste
+    let startX = 0;
+    p_doc.addEventListener('touchstart', e => {{ startX = e.changedTouches[0].screenX; }}, false);
+    p_doc.addEventListener('touchend', e => {{
+        let endX = e.changedTouches[0].screenX;
+        if (startX - endX > 100) {{
+            const b = Array.from(p_doc.querySelectorAll('button')).find(el => el.innerText.includes('Weiter'));
+            if (b) b.click();
+        }}
+    }}, false);
     </script>
 """, height=0)
