@@ -5,13 +5,19 @@ import random
 import streamlit.components.v1 as components
 
 # --- INITIALISIERUNG ---
-# Wir initialisieren die Zustände, falls sie noch nicht existieren.
+# Wir stellen sicher, dass alle Zustände vorhanden sind
 if 'idx' not in st.session_state: st.session_state.idx = 0
 if 'reveal' not in st.session_state: st.session_state.reveal = False
 if 'font_scale' not in st.session_state: st.session_state.font_scale = 100
 if 'order' not in st.session_state: st.session_state.order = []
 if 'last_path' not in st.session_state: st.session_state.last_path = ""
 if 'last_shuffle' not in st.session_state: st.session_state.last_shuffle = False
+
+# Hilfsfunktion für den sofortigen Reset bei Änderungen
+def reset_quiz_state():
+    st.session_state.idx = 0
+    st.session_state.reveal = False
+    st.session_state.order = []
 
 # --- SIDEBAR: DESIGN & LOGIK ---
 st.sidebar.title("🎨 Design & Logik")
@@ -24,12 +30,22 @@ themes = {
 selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()), key="theme_select")
 t = themes[selected_theme]
 
-shuffle_mode = st.sidebar.checkbox("Zufällige Reihenfolge", value=st.session_state.last_shuffle, key="shuffle_check")
+# Shuffle-Steuerung mit on_change für sofortige Reaktion
+shuffle_mode = st.sidebar.checkbox(
+    "Zufällige Reihenfolge", 
+    value=st.session_state.last_shuffle, 
+    key="shuffle_check",
+    on_change=reset_quiz_state
+)
 
-if st.sidebar.button("🎲 Neu Mischen"):
-    st.session_state.order = []
-    st.session_state.idx = 0
-    st.rerun()
+col_mix, col_refresh = st.sidebar.columns(2)
+with col_mix:
+    if st.button("🎲 Neu Mischen"):
+        reset_quiz_state()
+        st.rerun()
+with col_refresh:
+    if st.button("🔄 Auffrischen"):
+        st.rerun()
 
 st.session_state.font_scale = st.sidebar.slider("Schriftgröße (%)", 50, 150, st.session_state.font_scale, 5)
 scale = st.session_state.font_scale / 100.0
@@ -100,24 +116,22 @@ components.html(
 BASE_DIR = "Quizzes"
 if os.path.exists(BASE_DIR):
     categories = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
-    # Eindeutiger Key für die Kategorie-Auswahl
-    cat = st.sidebar.selectbox("Kategorie", categories, key="cat_select")
+    cat = st.sidebar.selectbox("Kategorie", categories, key="cat_select", on_change=reset_quiz_state)
     
     if cat:
         path = os.path.join(BASE_DIR, cat)
         files = sorted([f for f in os.listdir(path) if f.endswith('.csv')])
-        # Eindeutiger Key für das Quiz-File, abhängig von der Kategorie
-        quiz_file = st.sidebar.selectbox("Quiz", files, key=f"quiz_select_{cat}")
+        quiz_file = st.sidebar.selectbox("Quiz", files, key=f"quiz_select_{cat}", on_change=reset_quiz_state)
         
         if quiz_file:
             full_path = os.path.join(path, quiz_file)
             quiz_name_clean = os.path.splitext(quiz_file)[0].replace('_', ' ')
             
-            # Daten einmalig laden, um die Länge zu bestimmen
+            # Daten laden
             df = pd.read_csv(full_path)
             num_cards = len(df)
 
-            # SYNCHRONISATION: Wenn der Pfad oder Shuffle-Modus abweicht
+            # SYNCHRONISATION: Wenn der Pfad oder Shuffle-Modus abweicht (als Backup zum Callback)
             if (st.session_state.last_path != full_path or 
                 st.session_state.last_shuffle != shuffle_mode or 
                 not st.session_state.order or 
@@ -143,7 +157,7 @@ if os.path.exists(BASE_DIR):
                 st.session_state.reveal = False
                 st.rerun()
 
-            # 2. FRAGE (Aktuelle Reihe aus Order ziehen)
+            # 2. FRAGE
             current_row_idx = st.session_state.order[st.session_state.idx]
             question_text = df.iloc[current_row_idx, 0]
             answer_text = df.iloc[current_row_idx, 1]
