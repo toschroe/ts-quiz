@@ -2,202 +2,289 @@ import streamlit as st
 import pandas as pd
 import os
 import random
-import streamlit.components.v1 as components
 
-# --- INITIALISIERUNG ---
-if 'idx' not in st.session_state: st.session_state.idx = 0
-if 'reveal' not in st.session_state: st.session_state.reveal = False
-if 'font_scale' not in st.session_state: st.session_state.font_scale = 100
-if 'order' not in st.session_state: st.session_state.order = []
-if 'last_path' not in st.session_state: st.session_state.last_path = ""
-if 'last_shuffle' not in st.session_state: st.session_state.last_shuffle = False
+# --- KONFIGURATION & THEMES ---
+st.set_page_config(page_title="Flashcard Pro", layout="wide", initial_sidebar_state="expanded")
 
-# Hilfsfunktionen für den Reset
-def full_reset():
-    st.session_state.idx = 0
-    st.session_state.reveal = False
-    st.session_state.order = []
-    st.session_state.last_path = "" # Erzwingt kompletten Reload
-    st.session_state.last_shuffle = not st.session_state.last_shuffle # Provokation für Sync-Block
-
-def soft_reset():
-    st.session_state.idx = 0
-    st.session_state.reveal = False
-    st.session_state.order = []
-
-# --- SIDEBAR: DESIGN & LOGIK ---
-st.sidebar.title("🎨 Design & Logik")
-
-themes = {
-    "Hell (NotebookLM)": {"bg": "#ffffff", "sidebar": "#f8f9fa", "card_bg": "#fdfdfd", "text": "#1a1a1a", "border": "#eeeeee"},
-    "Dunkel": {"bg": "#0e1117", "sidebar": "#161b22", "card_bg": "#1d2127", "text": "#fafafa", "border": "#31353f"},
-    "Kontrast": {"bg": "#0a0e14", "sidebar": "#11151c", "card_bg": "#0a0e14", "text": "#ffb86c", "border": "#ffb86c"}
+THEMES = {
+    "Hell": {
+        "bg": "#f8f9fa",
+        "card_bg": "#ffffff",
+        "text": "#212529",
+        "sidebar": "#f1f3f5",
+        "accent": "#007bff"
+    },
+    "Dunkel": {
+        "bg": "#0e1117",
+        "card_bg": "#262730",
+        "text": "#fafafa",
+        "sidebar": "#161b22",
+        "accent": "#58a6ff"
+    },
+    "Kontrast": {
+        "bg": "#000000",
+        "card_bg": "#1a1a1a",
+        "text": "#ffb86c",
+        "sidebar": "#111111",
+        "accent": "#ffb86c"
+    }
 }
-selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()), key="theme_select")
-t = themes[selected_theme]
 
-# Shuffle-Steuerung
-shuffle_mode = st.sidebar.checkbox(
-    "Zufällige Reihenfolge", 
-    value=st.session_state.last_shuffle, 
-    key="shuffle_check",
-    on_change=soft_reset
-)
+# --- HILFSFUNKTIONEN ---
+def get_quiz_structure(base_path="Quizzes"):
+    """Liest die Ordnerstruktur und CSV-Dateien alphabetisch ein."""
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
+        # Dummy Daten für den ersten Start
+        os.makedirs(f"{base_path}/Beispiel")
+        df = pd.DataFrame([["Was ist 2+2?", "4"], ["Hauptstadt von DE?", "Berlin"]])
+        df.to_csv(f"{base_path}/Beispiel/Demo.csv", index=False, header=False)
 
-col_mix, col_refresh = st.sidebar.columns(2)
-with col_mix:
-    if st.button("🎲 Neu Mischen"):
-        soft_reset()
+    categories = sorted([d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))])
+    structure = {}
+    for cat in categories:
+        cat_path = os.path.join(base_path, cat)
+        files = sorted([f for f in os.listdir(cat_path) if f.endswith('.csv')])
+        if files:
+            structure[cat] = files
+    return structure
+
+def load_csv(path):
+    try:
+        df = pd.read_csv(path, header=None, names=["Frage", "Antwort"])
+        return df.values.tolist()
+    except Exception as e:
+        st.error(f"Fehler beim Laden: {e}")
+        return [["Fehler", "Datei konnte nicht gelesen werden"]]
+
+# --- SESSION STATE INITIALISIERUNG ---
+if 'idx' not in st.session_state:
+    st.session_state.idx = 0
+if 'reveal' not in st.session_state:
+    st.session_state.reveal = False
+if 'font_scale' not in st.session_state:
+    st.session_state.font_scale = 1.0
+if 'theme' not in st.session_state:
+    st.session_state.theme = "Hell"
+if 'shuffle' not in st.session_state:
+    st.session_state.shuffle = False
+if 'order' not in st.session_state:
+    st.session_state.order = []
+if 'last_path' not in st.session_state:
+    st.session_state.last_path = ""
+
+# --- LOGIK ---
+quiz_structure = get_quiz_structure()
+
+# Sidebar Navigation
+with st.sidebar:
+    st.title("Settings")
+
+    if not quiz_structure:
+        st.warning("Keine Quizzes gefunden. Bitte 'Quizzes/' Ordner füllen.")
+        st.stop()
+
+    cat_list = list(quiz_structure.keys())
+    selected_cat = st.selectbox("Kategorie", cat_list)
+
+    file_list = quiz_structure[selected_cat]
+    selected_file = st.selectbox("Quiz-Datei", file_list)
+
+    full_path = os.path.join("Quizzes", selected_cat, selected_file)
+
+    # State Reset bei Dateiwechsel
+    if full_path != st.session_state.last_path:
+        st.session_state.last_path = full_path
+        data = load_csv(full_path)
+        st.session_state.order = list(range(len(data)))
+        if st.session_state.shuffle:
+            random.shuffle(st.session_state.order)
+        st.session_state.idx = 0
+        st.session_state.reveal = False
         st.rerun()
-with col_refresh:
-    if st.button("🔄 Auffrischen"):
-        full_reset()
+
+    st.divider()
+
+    # Shuffle & Reset
+    new_shuffle = st.toggle("Shuffle Modus", value=st.session_state.shuffle)
+    if new_shuffle != st.session_state.shuffle:
+        st.session_state.shuffle = new_shuffle
+        data = load_csv(full_path)
+        st.session_state.order = list(range(len(data)))
+        if new_shuffle:
+            random.shuffle(st.session_state.order)
+        st.session_state.idx = 0
         st.rerun()
 
-st.session_state.font_scale = st.sidebar.slider("Schriftgröße (%)", 50, 150, st.session_state.font_scale, 5)
-scale = st.session_state.font_scale / 100.0
+    if st.button("🔄 Neu Mischen"):
+        random.shuffle(st.session_state.order)
+        st.session_state.idx = 0
+        st.rerun()
 
-# --- CSS: VOLLSTÄNDIGE INTEGRATION ---
+    if st.button("🔥 Auffrischen (Hard Reset)"):
+        st.cache_data.clear()
+        st.rerun()
+
+    st.divider()
+
+    # Theme & Font
+    st.session_state.theme = st.radio("Theme", list(THEMES.keys()))
+    st.session_state.font_scale = st.slider("Schriftgröße", 0.8, 2.5, 1.2)
+
+# Daten laden
+current_data = load_csv(st.session_state.last_path)
+total_cards = len(st.session_state.order)
+current_card_idx = st.session_state.order[st.session_state.idx]
+question, answer = current_data[current_card_idx]
+
+# --- CSS INJECTION ---
+t = THEMES[st.session_state.theme]
+font_size = 20 * st.session_state.font_scale
+
 st.markdown(f"""
     <style>
-    .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
-    [data-testid="stSidebar"] {{ background-color: {t['sidebar']} !important; border-right: 1px solid {t['border']}; }}
-    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {{ color: {t['text']} !important; }}
-    [data-testid="stAppViewBlockContainer"] {{ padding-top: 2rem !important; padding-bottom: 6rem !important; }}
-
-    .card {{ 
-        padding: {25 * scale}px; border-radius: 20px; 
-        background: {t['card_bg']}; color: {t['text']};
-        border: 2px solid {t['border']}; text-align: center; 
-        font-size: {1.3 * scale}rem; margin: 15px 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        min-height: 200px;
-        display: flex; align-items: center; justify-content: center;
+    /* Viewport Optimierung */
+    .block-container {{
+        padding-top: 2rem !important;
+        padding-bottom: 5rem !important;
+        background-color: {t['bg']};
     }}
 
-    .stButton > button {{
-        width: 100% !important; border-radius: 12px !important;
-        border: 1px solid {t['border']} !important;
-        background-color: {t['card_bg']} !important;
-        color: {t['text']} !important;
-        height: 3.8em !important;
-        margin-bottom: 5px !important;
-        transition: transform 0.1s ease;
+    [data-testid="stSidebar"] {{
+        background-color: {t['sidebar']};
     }}
-    .stButton > button:active {{ transform: scale(0.98); }}
-    
-    header[data-testid="stHeader"] {{ background-color: transparent !important; }}
-    header[data-testid="stHeader"] svg {{ fill: {t['text']} !important; }}
-    .stMarkdown, p, span, label, .stCaption {{ color: {t['text']} !important; }}
+
+    /* Card Design */
+    .flashcard {{
+        background-color: {t['card_bg']};
+        color: {t['text']};
+        padding: 3rem;
+        border-radius: 20px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        border: 1px solid rgba(128,128,128,0.1);
+        margin: 2rem 0;
+        transition: all 0.3s ease;
+    }}
+
+    .question-text {{
+        font-size: {font_size}px;
+        font-weight: 600;
+        line-height: 1.4;
+    }}
+
+    .answer-box {{
+        background-color: {t['accent']}22;
+        border-left: 5px solid {t['accent']};
+        padding: 1.5rem;
+        margin-top: 2rem;
+        border-radius: 8px;
+        width: 100%;
+        color: {t['text']};
+        font-size: {font_size * 0.9}px;
+    }}
+
+    /* Buttons Scaling */
+    .stButton>button {{
+        width: 100%;
+        border-radius: 12px;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- KEYBOARD SHORTCUTS ---
-components.html(
-    f"""
+# --- NAVIGATION LOGIK ---
+def next_card():
+    st.session_state.idx = (st.session_state.idx + 1) % total_cards
+    st.session_state.reveal = False
+
+def prev_card():
+    st.session_state.idx = (st.session_state.idx - 1) % total_cards
+    st.session_state.reveal = False
+
+def back_10():
+    st.session_state.idx = (st.session_state.idx - 10) % total_cards
+    st.session_state.reveal = False
+
+def reset_idx():
+    st.session_state.idx = 0
+    st.session_state.reveal = False
+
+def toggle_reveal():
+    st.session_state.reveal = not st.session_state.reveal
+
+# --- MAIN UI ---
+# Top Navigation
+cols_top = st.columns([1, 2, 1])
+with cols_top[1]:
+    clean_name = selected_file.replace('.csv', '')
+    if st.button(f"Weiter mit **{clean_name}** ➡️", key="next_top", use_container_width=True):
+        next_card()
+        st.rerun()
+
+# Progress
+progress = (st.session_state.idx + 1) / total_cards
+st.progress(progress)
+st.caption(f"Karte {st.session_state.idx + 1} von {total_cards} • {selected_file}")
+
+# Flashcard Area
+st.markdown(f"""
+    <div class="flashcard">
+        <div class="question-text">{question}</div>
+    </div>
+""", unsafe_allow_html=True)
+
+# Reveal / Answer
+if st.button("Antwort einblenden / verbergen (Leertaste)", key="reveal_btn", type="primary"):
+    toggle_reveal()
+    st.rerun()
+
+if st.session_state.reveal:
+    st.markdown(f"""
+        <div class="answer-box">
+            <b>Antwort:</b><br>{answer}
+        </div>
+    """, unsafe_allow_html=True)
+
+st.divider()
+
+# Bottom Navigation
+cols_bot = st.columns(3)
+with cols_bot[0]:
+    if st.button("⬅️ Zurück", key="prev_btn"):
+        prev_card()
+        st.rerun()
+with cols_bot[1]:
+    if st.button("⏪ 10 zurück", key="back10_btn"):
+        back_10()
+        st.rerun()
+with cols_bot[2]:
+    if st.button("🏠 Auf Anfang", key="reset_btn"):
+        reset_idx()
+        st.rerun()
+
+# --- KEYBOARD SHORTCUTS (JavaScript) ---
+# Emuliert Klicks auf Streamlit-Buttons basierend auf ihren Keys
+st.components.v1.html(f"""
     <script>
     const doc = window.parent.document;
-    const handleKey = (e) => {{
-        if (e.key === 'Enter' || e.code === 'Space') {{
-            e.preventDefault();
-            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Antwort prüfen'));
-            if (btn) btn.click();
-        }} else if (e.key === 'ArrowRight') {{
-            e.preventDefault();
+    doc.addEventListener('keydown', function(e) {{
+        if (e.key === 'ArrowRight') {{
             const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Weiter mit'));
             if (btn) btn.click();
-        }} else if (e.key === 'ArrowLeft') {{
-            e.preventDefault();
-            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Zurück (1 Karte)'));
+        }}
+        if (e.key === 'ArrowLeft') {{
+            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Zurück'));
             if (btn) btn.click();
         }}
-    }};
-    doc.removeEventListener('keydown', handleKey);
-    doc.addEventListener('keydown', handleKey);
+        if (e.key === 'Enter' || e.key === ' ') {{
+            const btn = Array.from(doc.querySelectorAll('button')).find(el => el.innerText.includes('Antwort einblenden'));
+            if (btn) btn.click();
+        }}
+    }});
     </script>
-    """,
-    height=0,
-)
-
-# --- INHALT LADEN ---
-BASE_DIR = "Quizzes"
-if os.path.exists(BASE_DIR):
-    categories = sorted([d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))])
-    cat = st.sidebar.selectbox("Kategorie", categories, key="cat_select", on_change=soft_reset)
-    
-    if cat:
-        path = os.path.join(BASE_DIR, cat)
-        files = sorted([f for f in os.listdir(path) if f.endswith('.csv')])
-        quiz_file = st.sidebar.selectbox("Quiz", files, key=f"quiz_select_{cat}", on_change=soft_reset)
-        
-        if quiz_file:
-            full_path = os.path.join(path, quiz_file)
-            quiz_name_clean = os.path.splitext(quiz_file)[0].replace('_', ' ')
-            
-            # Daten laden
-            try:
-                df = pd.read_csv(full_path)
-                num_cards = len(df)
-
-                # SYNCHRONISATION (Verschärft)
-                if (st.session_state.last_path != full_path or 
-                    st.session_state.last_shuffle != shuffle_mode or 
-                    not st.session_state.order or 
-                    len(st.session_state.order) != num_cards):
-                    
-                    st.session_state.order = list(range(num_cards))
-                    if shuffle_mode:
-                        random.shuffle(st.session_state.order)
-                    
-                    st.session_state.idx = 0
-                    st.session_state.last_path = full_path
-                    st.session_state.last_shuffle = shuffle_mode
-                    st.session_state.reveal = False
-                    st.rerun() # Sofortiger Neustart mit neuen Daten
-                
-                # UI Anzeige
-                st.progress((st.session_state.idx + 1) / num_cards)
-                st.caption(f"Datei: {quiz_file} | Karte {st.session_state.idx + 1} von {num_cards}")
-
-                # 1. NAVIGATION OBEN
-                if st.button(f"Weiter mit {quiz_name_clean} ➡️", key="next_btn"):
-                    st.session_state.idx = (st.session_state.idx + 1) % num_cards
-                    st.session_state.reveal = False
-                    st.rerun()
-
-                # 2. FRAGE
-                current_row_idx = st.session_state.order[st.session_state.idx]
-                question_text = df.iloc[current_row_idx, 0]
-                answer_text = df.iloc[current_row_idx, 1]
-                
-                st.markdown(f'<div class="card">{question_text}</div>', unsafe_allow_html=True)
-                
-                # 3. ANTWORT
-                if st.button("Antwort prüfen", key="reveal_btn"):
-                    st.session_state.reveal = not st.session_state.reveal
-                
-                if st.session_state.reveal:
-                    st.info(f"**Antwort:** {answer_text}")
-                    
-                # 4. NAVIGATION UNTEN
-                st.write("---") 
-                if st.button("⬅️ Zurück (1 Karte)", key="back_btn"):
-                    st.session_state.idx = (st.session_state.idx - 1) % num_cards
-                    st.session_state.reveal = False
-                    st.rerun()
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("⏪ 10 zurück", key="back10_btn"):
-                        st.session_state.idx = (st.session_state.idx - 10) % num_cards
-                        st.session_state.reveal = False
-                        st.rerun()
-                with c2:
-                    if st.button("🏠 Anfang", key="reset_btn"):
-                        st.session_state.idx = 0
-                        st.session_state.reveal = False
-                        st.rerun()
-            except Exception as e:
-                st.error(f"Fehler beim Laden der CSV: {e}")
-else:
-    st.warning("Ordner 'Quizzes' nicht gefunden.")
+""", height=0)
