@@ -1,41 +1,68 @@
 import streamlit as st
 import pandas as pd
+import streamlit as st
+import pandas as pd
 import os
 
-# --- THEME DEFINITIONEN ---
-themes = {
-    "Hell (NotebookLM)": {
-        "bg": "#ffffff", "card_bg": "#fdfdfd", "text": "#1a1a1a", "border": "#eeeeee"
-    },
-    "Dunkel": {
-        "bg": "#0e1117", "card_bg": "#1d2127", "text": "#fafafa", "border": "#31353f"
-    },
-    "Kontrast": {
-        "bg": "#000000", "card_bg": "#000000", "text": "#ffff00", "border": "#ffff00"
-    }
-}
+# --- SESSION STATE FÜR SCHRIFTGRÖSSE ---
+if 'font_scale' not in st.session_state:
+    st.session_state.font_scale = 100
 
-st.sidebar.title("🎨 Design & Navigation")
-selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()))
+# --- THEME & NAVIGATION (SIDEBAR) ---
+st.sidebar.title("🎨 Design & Steuerung")
+
+# Manuelle Größensteuerung
+st.session_state.font_scale = st.sidebar.slider(
+    "Schriftgröße (%)", 50, 150, st.session_state.font_scale, 5
+)
+
+# Theme Auswahl (wie zuvor)
+themes = {
+    "Hell (NotebookLM)": {"bg": "#ffffff", "card_bg": "#fdfdfd", "text": "#1a1a1a", "border": "#eeeeee"},
+    "Dunkel": {"bg": "#0e1117", "card_bg": "#1d2127", "text": "#fafafa", "border": "#31353f"},
+    "Kontrast": {"bg": "#000000", "card_bg": "#000000", "text": "#ffff00", "border": "#ffff00"}
+}
+selected_theme = st.sidebar.selectbox("Theme", list(themes.keys()))
 t = themes[selected_theme]
 
-# Dynamisches CSS Injektion
+# --- RESPONSIVE CSS MIT MEDIA QUERIES ---
+scale = st.session_state.font_scale / 100.0
+
 st.markdown(f"""
     <style>
     .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
-    .stButton>button {{ width: 100%; border-radius: 12px; border: 1px solid {t['border']}; background: {t['card_bg']}; color: {t['text']}; }}
+    
+    /* Die Karte mit dynamischer Skalierung */
     .card {{ 
-        padding: 40px; border-radius: 20px; 
+        padding: {30 * scale}px; 
+        border-radius: 20px; 
         background: {t['card_bg']}; 
         color: {t['text']};
         border: 2px solid {t['border']};
-        text-align: center; font-size: 1.4rem; margin-bottom: 20px;
+        text-align: center; 
+        font-size: {1.4 * scale}rem; 
+        line-height: 1.4;
+        margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }}
-    /* Fix für Tablet/Mobile Sichtbarkeit */
+
+    /* Media Query für Handys (Bildschirme schmaler als 600px) */
+    @media (max-width: 600px) {{
+        .card {{
+            padding: {20 * scale}px;
+            font-size: {1.1 * scale}rem;
+            margin-top: 10px;
+        }}
+        .stButton>button {{
+            height: 3.5em; /* Größere Klickfläche für Daumen */
+        }}
+    }}
+
     p, span, label {{ color: {t['text']} !important; }}
     </style>
 """, unsafe_allow_html=True)
+
+# ... (Hier folgt dein CSV-Lade-Code und die Quiz-Logik)
 
 
 BASE_DIR = "Quizzes"
