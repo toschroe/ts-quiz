@@ -30,7 +30,9 @@ THEMES = {
     }
 }
 
-# --- HILFSFUNKTIONEN ---
+# --- HILFSFUNKTIONEN MIT CACHING ---
+
+@st.cache_data
 def get_quiz_structure(base_path="Quizzes"):
     """Liest die Ordnerstruktur und CSV-Dateien alphabetisch ein."""
     if not os.path.exists(base_path):
@@ -49,8 +51,16 @@ def get_quiz_structure(base_path="Quizzes"):
             structure[cat] = files
     return structure
 
+@st.cache_data
 def load_csv(path):
+    """
+    Lädt eine CSV-Datei. Durch das Caching und die Zuweisung im Main-Scope
+    werden alte Referenzen bei einem Neuaufruf automatisch überschrieben
+    und der Speicher für die neue Datei freigegeben.
+    """
     try:
+        # Wir erzwingen hier kein "global clear", da Python's Garbage Collection
+        # die alte Liste löscht, sobald die Variable im Session State neu zugewiesen wird.
         df = pd.read_csv(path, header=None, names=["Frage", "Antwort"])
         return df.values.tolist()
     except Exception as e:
@@ -122,7 +132,10 @@ with st.sidebar:
         st.rerun()
 
     if st.button("🔥 Auffrischen (Hard Reset)"):
+        # Löscht den gesamten Cache und zwingt zum Neulesen aller Dateien
         st.cache_data.clear()
+        # Setzt den Pfad zurück, um ein Neu-Triggering der Ladelogik zu erzwingen
+        st.session_state.last_path = ""
         st.rerun()
 
     st.divider()
@@ -134,6 +147,11 @@ with st.sidebar:
 # Daten laden
 current_data = load_csv(st.session_state.last_path)
 total_cards = len(st.session_state.order)
+
+# Validierung der Index-Sicherheit (falls Datei kleiner wurde)
+if st.session_state.idx >= total_cards:
+    st.session_state.idx = 0
+
 current_card_idx = st.session_state.order[st.session_state.idx]
 question, answer = current_data[current_card_idx]
 
@@ -268,7 +286,6 @@ with cols_bot[2]:
         st.rerun()
 
 # --- KEYBOARD SHORTCUTS (JavaScript) ---
-# Emuliert Klicks auf Streamlit-Buttons basierend auf ihren Keys
 st.components.v1.html(f"""
     <script>
     const doc = window.parent.document;
