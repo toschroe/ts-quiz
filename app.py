@@ -100,6 +100,9 @@ if os.path.exists(BASE_DIR):
         quiz_file = st.sidebar.selectbox("Quiz", files)
         
         if quiz_file:
+            # Dateiname ohne Endung für die Button-Beschriftung
+            quiz_name_clean = os.path.splitext(quiz_file)[0].replace('_', ' ')
+            
             # Daten laden
             df = pd.read_csv(os.path.join(path, quiz_file))
             num_cards = len(df)
@@ -119,7 +122,7 @@ if os.path.exists(BASE_DIR):
             st.caption(f"Karte {st.session_state.idx + 1} von {num_cards}")
 
             # 1. NAVIGATION OBEN
-            if st.button("Weiter ➡️"):
+            if st.button(f"Weiter mit {quiz_name_clean} ➡️"):
                 st.session_state.idx = (st.session_state.idx + 1) % num_cards
                 st.session_state.reveal = False
                 st.rerun()
