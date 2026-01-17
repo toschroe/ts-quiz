@@ -166,7 +166,10 @@ st.markdown(f"""
     [data-testid="stSidebar"] .stMarkdown,
     [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] .stCaption,
-    [data-testid="stSidebar"] p {{
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {{
         color: {t['sidebar_text']} !important;
     }}
 
