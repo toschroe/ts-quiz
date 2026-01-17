@@ -2,56 +2,63 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="Flashcard Hub", layout="centered")
+st.set_page_config(page_title="NotebookLM Quiz Clone", layout="centered")
 
-# Styling für den NotebookLM Vibe
+# CSS für den minimalistischen Look
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; border-radius: 20px; height: 3em; background-color: #f0f2f6; }
-    .card-box { padding: 20px; border-radius: 15px; border: 1px solid #ddd; background-color: white; min-height: 150px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 1.2rem; margin-bottom: 20px; }
+    .stButton>button { width: 100%; border-radius: 12px; border: 1px solid #ddd; background: white; transition: 0.3s; }
+    .stButton>button:hover { border-color: #4CAF50; color: #4CAF50; }
+    .card { padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background: #fdfdfd; border: 1px solid #f0f0f0; margin-bottom: 20px; text-align: center; font-size: 1.3rem; line-height: 1.5; }
     </style>
 """, unsafe_allow_html=True)
 
-# 1. Ordner- und Dateiauswahl
-st.sidebar.title("📚 Quiz-Kategorien")
-folders = [f for f in os.listdir('.') if os.path.isdir(f) and not f.startswith('.')]
-category = st.sidebar.selectbox("Kategorie wählen", folders)
+BASE_DIR = "Quizzes"
 
-if category:
-    files = [f for f in os.listdir(category) if f.endswith('.csv')]
-    quiz_file = st.sidebar.selectbox("Quiz wählen", files)
+# Navigation
+st.sidebar.title("Navigation")
+if not os.path.exists(BASE_DIR):
+    st.error(f"Ordner '{BASE_DIR}' nicht gefunden. Bitte erstelle ihn in GitHub.")
+else:
+    categories = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
+    selected_cat = st.sidebar.selectbox("Kategorie", categories) if categories else None
 
-    if quiz_file:
-        df = pd.read_csv(os.path.join(category, quiz_file))
-        
-        if 'index' not in st.session_state: st.session_state.index = 0
-        if 'show_answer' not in st.session_state: st.session_state.show_answer = False
+    if selected_cat:
+        quiz_path = os.path.join(BASE_DIR, selected_cat)
+        quizzes = [f for f in os.listdir(quiz_path) if f.endswith('.csv')]
+        selected_quiz = st.sidebar.selectbox("Quiz wählen", quizzes)
 
-        # Fortschrittsanzeige
-        progress = (st.session_state.index + 1) / len(df)
-        st.progress(progress)
-        st.write(f"Frage {st.session_state.index + 1} von {len(df)}")
+        if selected_quiz:
+            df = pd.read_csv(os.path.join(quiz_path, selected_quiz))
+            
+            if 'idx' not in st.session_state: st.session_state.idx = 0
+            if 'reveal' not in st.session_state: st.session_state.reveal = False
 
-        # Die Karte
-        question = df.iloc[st.session_state.index, 0]
-        answer = df.iloc[st.session_state.index, 1]
+            # UI
+            st.title(f"📖 {selected_cat}")
+            
+            # Karte anzeigen
+            q_text = df.iloc[st.session_state.idx, 0]
+            a_text = df.iloc[st.session_state.idx, 1]
+            
+            st.markdown(f'<div class="card">{q_text}</div>', unsafe_allow_html=True)
+            
+            if st.button("Antwort anzeigen"):
+                st.session_state.reveal = True
+            
+            if st.session_state.reveal:
+                st.success(f"**Antwort:** {a_text}")
 
-        st.markdown(f'<div class="card-box">{question}</div>', unsafe_allow_html=True)
-
-        if st.button("Antwort zeigen / verbergen"):
-            st.session_state.show_answer = not st.session_state.show_answer
-
-        if st.session_state.show_answer:
-            st.info(f"**Antwort:**\n\n{answer}")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("⬅️ Zurück"):
-                st.session_state.index = (st.session_state.index - 1) % len(df)
-                st.session_state.show_answer = False
-                st.rerun()
-        with col2:
-            if st.button("Weiter ➡️"):
-                st.session_state.index = (st.session_state.index + 1) % len(df)
-                st.session_state.show_answer = False
-                st.rerun()
+            st.divider()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Previous"):
+                    st.session_state.idx = (st.session_state.idx - 1) % len(df)
+                    st.session_state.reveal = False
+                    st.rerun()
+            with col2:
+                if st.button("Next"):
+                    st.session_state.idx = (st.session_state.idx + 1) % len(df)
+                    st.session_state.reveal = False
+                    st.rerun()
