@@ -10,7 +10,7 @@ if 'idx' not in st.session_state: st.session_state.idx = 0
 if 'reveal' not in st.session_state: st.session_state.reveal = False
 if 'font_scale' not in st.session_state: st.session_state.font_scale = 100
 if 'order' not in st.session_state: st.session_state.order = []
-if 'last_quiz' not in st.session_state: st.session_state.last_quiz = ""
+if 'last_path' not in st.session_state: st.session_state.last_path = ""
 if 'last_shuffle' not in st.session_state: st.session_state.last_shuffle = False
 
 # --- SIDEBAR: DESIGN & LOGIK ---
@@ -21,10 +21,10 @@ themes = {
     "Dunkel": {"bg": "#0e1117", "sidebar": "#161b22", "card_bg": "#1d2127", "text": "#fafafa", "border": "#31353f"},
     "Kontrast": {"bg": "#0a0e14", "sidebar": "#11151c", "card_bg": "#0a0e14", "text": "#ffb86c", "border": "#ffb86c"}
 }
-selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()))
+selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()), key="theme_select")
 t = themes[selected_theme]
 
-shuffle_mode = st.sidebar.checkbox("Zufällige Reihenfolge", value=st.session_state.last_shuffle)
+shuffle_mode = st.sidebar.checkbox("Zufällige Reihenfolge", value=st.session_state.last_shuffle, key="shuffle_check")
 
 if st.sidebar.button("🎲 Neu Mischen"):
     st.session_state.order = []
@@ -100,20 +100,25 @@ components.html(
 BASE_DIR = "Quizzes"
 if os.path.exists(BASE_DIR):
     categories = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
-    cat = st.sidebar.selectbox("Kategorie", categories)
+    # Eindeutiger Key für die Kategorie-Auswahl
+    cat = st.sidebar.selectbox("Kategorie", categories, key="cat_select")
     
     if cat:
         path = os.path.join(BASE_DIR, cat)
-        files = [f for f in os.listdir(path) if f.endswith('.csv')]
-        quiz_file = st.sidebar.selectbox("Quiz", files)
+        files = sorted([f for f in os.listdir(path) if f.endswith('.csv')])
+        # Eindeutiger Key für das Quiz-File, abhängig von der Kategorie
+        quiz_file = st.sidebar.selectbox("Quiz", files, key=f"quiz_select_{cat}")
         
         if quiz_file:
+            full_path = os.path.join(path, quiz_file)
             quiz_name_clean = os.path.splitext(quiz_file)[0].replace('_', ' ')
-            df = pd.read_csv(os.path.join(path, quiz_file))
+            
+            # Daten einmalig laden, um die Länge zu bestimmen
+            df = pd.read_csv(full_path)
             num_cards = len(df)
 
-            # SYNCHRONISATION: Wenn sich das Quiz oder der Modus ändert
-            if (st.session_state.last_quiz != quiz_file or 
+            # SYNCHRONISATION: Wenn der Pfad oder Shuffle-Modus abweicht
+            if (st.session_state.last_path != full_path or 
                 st.session_state.last_shuffle != shuffle_mode or 
                 not st.session_state.order or 
                 len(st.session_state.order) != num_cards):
@@ -123,24 +128,22 @@ if os.path.exists(BASE_DIR):
                     random.shuffle(st.session_state.order)
                 
                 st.session_state.idx = 0
-                st.session_state.last_quiz = quiz_file
+                st.session_state.last_path = full_path
                 st.session_state.last_shuffle = shuffle_mode
                 st.session_state.reveal = False
                 st.rerun()
             
-            # Anzeige der aktuellen Karte
+            # UI Anzeige
             st.progress((st.session_state.idx + 1) / num_cards)
-            st.caption(f"Karte {st.session_state.idx + 1} von {num_cards} | ⌨️ [Enter/Space]: Antwort | [→]: Weiter | [←]: Zurück")
+            st.caption(f"Datei: {quiz_file} | Karte {st.session_state.idx + 1} von {num_cards}")
 
-            # 1. NAVIGATION OBEN (Weiter)
-            # Wir nutzen einen Key, um Streamlit zu zwingen, den Button-State sauber zu trennen
+            # 1. NAVIGATION OBEN
             if st.button(f"Weiter mit {quiz_name_clean} ➡️", key="next_btn"):
                 st.session_state.idx = (st.session_state.idx + 1) % num_cards
                 st.session_state.reveal = False
                 st.rerun()
 
-            # 2. FRAGE
-            # WICHTIG: Wir berechnen die Zeile erst direkt vor der Anzeige
+            # 2. FRAGE (Aktuelle Reihe aus Order ziehen)
             current_row_idx = st.session_state.order[st.session_state.idx]
             question_text = df.iloc[current_row_idx, 0]
             answer_text = df.iloc[current_row_idx, 1]
@@ -173,4 +176,4 @@ if os.path.exists(BASE_DIR):
                     st.session_state.reveal = False
                     st.rerun()
 else:
-    st.warning("Ordner 'Quizzes' nicht gefunden. Bitte erstelle den Ordner 'Quizzes' und lege dort Kategorien (Unterordner) mit CSV-Dateien an.")
+    st.warning("Ordner 'Quizzes' nicht gefunden. Bitte Struktur prüfen.")
