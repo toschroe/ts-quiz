@@ -175,12 +175,20 @@ st.markdown(f"""
         color: {t['sidebar_text']} !important;
     }}
 
-    /* Fix für die Pfeile (Collapse/Expand) und Icons */
+    /* Fix für die Pfeile (Collapse/Expand) und Icons - IMMER SICHTBAR */
     [data-testid="stSidebarCollapseButton"] svg,
     [data-testid="openSidebar"] svg,
     button[kind="header"] svg {{
         color: {t['sidebar_text']} !important;
         fill: {t['sidebar_text']} !important;
+        opacity: 1 !important;
+    }}
+
+    /* Hintergrund der Sidebar-Pfeil-Buttons anpassen für bessere Sichtbarkeit */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="openSidebar"] {{
+        background-color: transparent !important;
+        opacity: 1 !important;
     }}
 
     /* Die Flashcard */
