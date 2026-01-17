@@ -30,9 +30,10 @@ scale = st.session_state.font_scale / 100.0
 
 st.markdown(f"""
     <style>
+    /* Grund-App-Hintergrund */
     .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
     
-    /* Die Karte mit dynamischer Skalierung */
+    /* Karten-Style */
     .card {{ 
         padding: {30 * scale}px; 
         border-radius: 20px; 
@@ -41,25 +42,37 @@ st.markdown(f"""
         border: 2px solid {t['border']};
         text-align: center; 
         font-size: {1.4 * scale}rem; 
-        line-height: 1.4;
         margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }}
 
-    /* Media Query für Handys (Bildschirme schmaler als 600px) */
-    @media (max-width: 600px) {{
-        .card {{
-            padding: {20 * scale}px;
-            font-size: {1.1 * scale}rem;
-            margin-top: 10px;
-        }}
-        .stButton>button {{
-            height: 3.5em; /* Größere Klickfläche für Daumen */
-        }}
+    /* EXPLIZITER FIX FÜR BUTTONS */
+    .stButton > button {{
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid {t['border']} !important;
+        background-color: {t['card_bg']} !important;
+        color: {t['text']} !important; /* Schriftfarbe des Buttons */
     }}
 
-    p, span, label {{ color: {t['text']} !important; }}
+    /* Fix für Button-Text (manchmal tiefer im DOM) */
+    .stButton > button p {{
+        color: {t['text']} !important;
+    }}
+
+    /* Hover-Effekt: Etwas heller/dunkler als der Hintergrund */
+    .stButton > button:hover {{
+        border-color: {t['text']} !important;
+        background-color: {t['bg']} !important;
+        color: {t['text']} !important;
+    }}
+
+    /* Alles andere (Sidebar-Labels etc.) auf die richtige Textfarbe zwingen */
+    .stMarkdown, p, span, label, .stSelectbox label {{
+        color: {t['text']} !important;
+    }}
     </style>
+
 """, unsafe_allow_html=True)
 
 # ... (Hier folgt dein CSV-Lade-Code und die Quiz-Logik)
