@@ -9,7 +9,7 @@ if 'reveal' not in st.session_state: st.session_state.reveal = False
 if 'font_scale' not in st.session_state: st.session_state.font_scale = 100
 if 'order' not in st.session_state: st.session_state.order = []
 
-# --- SIDEBAR & STEUERUNG ---
+# --- SIDEBAR & DESIGN ---
 st.sidebar.title("🎨 Design & Logik")
 shuffle = st.sidebar.checkbox("Zufällige Reihenfolge")
 st.session_state.font_scale = st.sidebar.slider("Schriftgröße (%)", 50, 150, st.session_state.font_scale, 5)
@@ -23,15 +23,11 @@ selected_theme = st.sidebar.selectbox("Theme", list(themes.keys()))
 t = themes[selected_theme]
 scale = st.session_state.font_scale / 100.0
 
-# --- CSS: ASYMMETRISCHES LAYOUT ---
+# --- CSS: FIXED NAVIGATION & SCALING ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
-    
-    [data-testid="stAppViewBlockContainer"] {{
-        padding-top: 1.5rem !important;
-        padding-bottom: 6rem !important;
-    }}
+    [data-testid="stAppViewBlockContainer"] {{ padding-top: 1.5rem !important; padding-bottom: 6rem !important; }}
 
     .card {{ 
         padding: {25 * scale}px; border-radius: 20px; 
@@ -48,7 +44,6 @@ st.markdown(f"""
         color: {t['text']} !important;
         height: 3.5em !important;
     }}
-    
     .stMarkdown, p, span, label {{ color: {t['text']} !important; }}
     </style>
 """, unsafe_allow_html=True)
@@ -66,19 +61,15 @@ if os.path.exists(BASE_DIR):
         if quiz_file:
             df = pd.read_csv(os.path.join(path, quiz_file))
             
-            # Shuffle Logik
+            # Reset Order bei neuem Quiz oder Shuffle-Wechsel
             if not st.session_state.order or len(st.session_state.order) != len(df):
                 st.session_state.order = list(range(len(df)))
-                if shuffle:
-                    random.shuffle(st.session_state.order)
+                if shuffle: random.shuffle(st.session_state.order)
             
-            # Aktueller Index basierend auf Order
             current_row = st.session_state.order[st.session_state.idx]
-            
-            # Fortschritt
             st.progress((st.session_state.idx + 1) / len(df))
 
-            # 1. NAVIGATION OBEN (Weiter)
+            # 1. NAVIGATION OBEN
             if st.button("Weiter ➡️"):
                 st.session_state.idx = (st.session_state.idx + 1) % len(df)
                 st.session_state.reveal = False
@@ -89,16 +80,20 @@ if os.path.exists(BASE_DIR):
             a = df.iloc[current_row, 1]
             st.markdown(f'<div class="card">{q}</div>', unsafe_allow_html=True)
             
-            # 3. ANTWORT PRÜFEN
+            # 3. ANTWORT
             if st.button("Antwort prüfen"):
                 st.session_state.reveal = not st.session_state.reveal
-            
             if st.session_state.reveal:
                 st.info(f"**Antwort:** {a}")
                 
-            # 4. NAVIGATION UNTEN (Immer sichtbar)
+            # 4. NAVIGATION UNTEN (Statisch)
             st.write("---") 
-            if st.button("⬅️ Zurück (vorherige Karte)"):
+            if st.button("⬅️ Zurück (1 Karte)"):
                 st.session_state.idx = (st.session_state.idx - 1) % len(df)
+                st.session_state.reveal = False
+                st.rerun()
+            
+            if st.button("⏪ 10 Karten zurück"):
+                st.session_state.idx = (st.session_state.idx - 10) % len(df)
                 st.session_state.reveal = False
                 st.rerun()
