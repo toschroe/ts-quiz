@@ -1,14 +1,17 @@
 import streamlit as st
 import pandas as pd
 import os
+import random
 
 # --- INITIALISIERUNG ---
 if 'idx' not in st.session_state: st.session_state.idx = 0
 if 'reveal' not in st.session_state: st.session_state.reveal = False
 if 'font_scale' not in st.session_state: st.session_state.font_scale = 100
+if 'order' not in st.session_state: st.session_state.order = []
 
-# --- SIDEBAR & DESIGN ---
-st.sidebar.title("🎨 Design & Steuerung")
+# --- SIDEBAR & STEUERUNG ---
+st.sidebar.title("🎨 Design & Logik")
+shuffle = st.sidebar.checkbox("Zufällige Reihenfolge")
 st.session_state.font_scale = st.sidebar.slider("Schriftgröße (%)", 50, 150, st.session_state.font_scale, 5)
 
 themes = {
@@ -20,35 +23,30 @@ selected_theme = st.sidebar.selectbox("Theme", list(themes.keys()))
 t = themes[selected_theme]
 scale = st.session_state.font_scale / 100.0
 
-# --- CSS: VOLLE BREITE & VERTICAL FLOW ---
+# --- CSS: ASYMMETRISCHES LAYOUT ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
     
-    /* Container Padding oben/unten */
     [data-testid="stAppViewBlockContainer"] {{
         padding-top: 1.5rem !important;
-        padding-bottom: 5rem !important;
+        padding-bottom: 6rem !important;
     }}
 
-    /* Card & Text */
     .card {{ 
         padding: {25 * scale}px; border-radius: 20px; 
         background: {t['card_bg']}; color: {t['text']};
         border: 2px solid {t['border']}; text-align: center; 
-        font-size: {1.3 * scale}rem; margin-top: 10px; margin-bottom: 10px;
+        font-size: {1.3 * scale}rem; margin: 15px 0;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }}
 
-    /* BUTTONS: Volle Breite, kein Nebeneinander-Zwang mehr */
     .stButton > button {{
-        width: 100% !important; 
-        border-radius: 12px !important;
+        width: 100% !important; border-radius: 12px !important;
         border: 1px solid {t['border']} !important;
         background-color: {t['card_bg']} !important;
         color: {t['text']} !important;
         height: 3.5em !important;
-        margin-bottom: 10px !important;
     }}
     
     .stMarkdown, p, span, label {{ color: {t['text']} !important; }}
@@ -63,36 +61,44 @@ if os.path.exists(BASE_DIR):
     if cat:
         path = os.path.join(BASE_DIR, cat)
         files = [f for f in os.listdir(path) if f.endswith('.csv')]
-        quiz = st.sidebar.selectbox("Quiz", files)
+        quiz_file = st.sidebar.selectbox("Quiz", files)
         
-        if quiz:
-            df = pd.read_csv(os.path.join(path, quiz))
+        if quiz_file:
+            df = pd.read_csv(os.path.join(path, quiz_file))
             
-            # Fortschrittsbalken
-            progress = (st.session_state.idx + 1) / len(df)
-            st.progress(progress)
+            # Shuffle Logik
+            if not st.session_state.order or len(st.session_state.order) != len(df):
+                st.session_state.order = list(range(len(df)))
+                if shuffle:
+                    random.shuffle(st.session_state.order)
+            
+            # Aktueller Index basierend auf Order
+            current_row = st.session_state.order[st.session_state.idx]
+            
+            # Fortschritt
+            st.progress((st.session_state.idx + 1) / len(df))
 
-            # 1. NAVIGATION OBEN (Nur Weiter)
+            # 1. NAVIGATION OBEN (Weiter)
             if st.button("Weiter ➡️"):
                 st.session_state.idx = (st.session_state.idx + 1) % len(df)
                 st.session_state.reveal = False
                 st.rerun()
 
             # 2. FRAGE
-            q = df.iloc[st.session_state.idx, 0]
-            a = df.iloc[st.session_state.idx, 1]
+            q = df.iloc[current_row, 0]
+            a = df.iloc[current_row, 1]
             st.markdown(f'<div class="card">{q}</div>', unsafe_allow_html=True)
             
-            # 3. ANTWORT-LOGIK
+            # 3. ANTWORT PRÜFEN
             if st.button("Antwort prüfen"):
                 st.session_state.reveal = not st.session_state.reveal
             
             if st.session_state.reveal:
                 st.info(f"**Antwort:** {a}")
                 
-                # 4. NAVIGATION UNTEN (Zurück - erscheint erst bei Bedarf oder statisch)
-                st.write("") 
-                if st.button("⬅️ Zurück"):
-                    st.session_state.idx = (st.session_state.idx - 1) % len(df)
-                    st.session_state.reveal = False
-                    st.rerun()
+            # 4. NAVIGATION UNTEN (Immer sichtbar)
+            st.write("---") 
+            if st.button("⬅️ Zurück (vorherige Karte)"):
+                st.session_state.idx = (st.session_state.idx - 1) % len(df)
+                st.session_state.reveal = False
+                st.rerun()
