@@ -25,20 +25,6 @@ st.markdown(f"""
     <style>
     .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
     
-    /* Erzwinge horizontale Anordnung der Spalten auf ALLEN Geräten */
-    [data-testid="stHorizontalBlock"] {{
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        gap: 10px !important;
-    }}
-    [data-testid="column"] {{
-        width: 100% !important;
-        flex: 1 1 auto !important;
-        min-width: 0px !important;
-    }}
-
     .card {{ 
         padding: {30 * scale}px; border-radius: 20px; 
         background: {t['card_bg']}; color: {t['text']};
@@ -46,17 +32,37 @@ st.markdown(f"""
         font-size: {1.4 * scale}rem; margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }}
-
-    .stButton > button {{
-        width: 100%; border-radius: 12px;
-        border: 1px solid {t['border']} !important;
-        background-color: {t['card_bg']} !important;
-        color: {t['text']} !important;
+    
+/* DER MOBILE FIX: Spalten-Abstand und Breite */
+    [data-testid="stHorizontalBlock"] {{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 5px !important; /* Minimaler Abstand zwischen den Knöpfen */
+        width: 100% !important;
     }}
     
-    .stButton > button p {{ color: {t['text']} !important; font-weight: bold; }}
+    [data-testid="column"] {{
+        flex: 1 !important;
+        width: 48% !important; /* Fast die Hälfte */
+        min-width: 0 !important; /* Verhindert das Herausschieben */
+    }}
 
-    .stMarkdown, p, span, label {{ color: {t['text']} !important; }}
+    .stButton > button {{
+        width: 100% !important;
+        padding-left: 2px !important;
+        padding-right: 2px !important;
+        white-space: nowrap !important; /* Verhindert Zeilenumbruch im Button */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: {1.0 * scale}rem !important; /* Etwas kleiner auf Mobile */
+    }}
+    
+    /* Speziell für den Text im Button */
+    .stButton > button p {{
+        font-size: 0.9rem !important;
+        margin: 0 !important;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
