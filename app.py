@@ -2,16 +2,41 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="NotebookLM Quiz Clone", layout="centered")
+# --- THEME DEFINITIONEN ---
+themes = {
+    "Hell (NotebookLM)": {
+        "bg": "#ffffff", "card_bg": "#fdfdfd", "text": "#1a1a1a", "border": "#eeeeee"
+    },
+    "Dunkel": {
+        "bg": "#0e1117", "card_bg": "#1d2127", "text": "#fafafa", "border": "#31353f"
+    },
+    "Kontrast": {
+        "bg": "#000000", "card_bg": "#000000", "text": "#ffff00", "border": "#ffff00"
+    }
+}
 
-# CSS für den minimalistischen Look
-st.markdown("""
+st.sidebar.title("🎨 Design & Navigation")
+selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()))
+t = themes[selected_theme]
+
+# Dynamisches CSS Injektion
+st.markdown(f"""
     <style>
-    .stButton>button { width: 100%; border-radius: 12px; border: 1px solid #ddd; background: white; transition: 0.3s; }
-    .stButton>button:hover { border-color: #4CAF50; color: #4CAF50; }
-    .card { padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background: #fdfdfd; border: 1px solid #f0f0f0; margin-bottom: 20px; text-align: center; font-size: 1.3rem; line-height: 1.5; }
+    .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
+    .stButton>button {{ width: 100%; border-radius: 12px; border: 1px solid {t['border']}; background: {t['card_bg']}; color: {t['text']}; }}
+    .card {{ 
+        padding: 40px; border-radius: 20px; 
+        background: {t['card_bg']}; 
+        color: {t['text']};
+        border: 2px solid {t['border']};
+        text-align: center; font-size: 1.4rem; margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }}
+    /* Fix für Tablet/Mobile Sichtbarkeit */
+    p, span, label {{ color: {t['text']} !important; }}
     </style>
 """, unsafe_allow_html=True)
+
 
 BASE_DIR = "Quizzes"
 
