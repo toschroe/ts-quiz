@@ -163,6 +163,8 @@ st.markdown(f"""
     [data-testid="stSidebar"] {{
         background-color: {t['sidebar']} !important;
     }}
+
+    /* Textfarben in der Sidebar erzwingen */
     [data-testid="stSidebar"] .stMarkdown,
     [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] .stCaption,
@@ -171,6 +173,14 @@ st.markdown(f"""
     [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3 {{
         color: {t['sidebar_text']} !important;
+    }}
+
+    /* Fix für die Pfeile (Collapse/Expand) und Icons */
+    [data-testid="stSidebarCollapseButton"] svg,
+    [data-testid="openSidebar"] svg,
+    button[kind="header"] svg {{
+        color: {t['sidebar_text']} !important;
+        fill: {t['sidebar_text']} !important;
     }}
 
     /* Die Flashcard */
