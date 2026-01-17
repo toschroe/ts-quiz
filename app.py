@@ -17,7 +17,7 @@ st.sidebar.title("🎨 Design & Logik")
 themes = {
     "Hell (NotebookLM)": {"bg": "#ffffff", "sidebar": "#f8f9fa", "card_bg": "#fdfdfd", "text": "#1a1a1a", "border": "#eeeeee"},
     "Dunkel": {"bg": "#0e1117", "sidebar": "#161b22", "card_bg": "#1d2127", "text": "#fafafa", "border": "#31353f"},
-    "Kontrast": {"bg": "#000000", "sidebar": "#1a1a00", "card_bg": "#000000", "text": "#ffff00", "border": "#ffff00"}
+    "Kontrast": {"bg": "#0a0e14", "sidebar": "#11151c", "card_bg": "#0a0e14", "text": "#ffb86c", "border": "#ffb86c"}
 }
 selected_theme = st.sidebar.selectbox("Theme wählen", list(themes.keys()))
 t = themes[selected_theme]
