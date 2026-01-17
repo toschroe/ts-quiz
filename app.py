@@ -17,6 +17,7 @@ THEMES = {
         "card_bg": "#ffffff",
         "text": "#212529",
         "sidebar": "#f1f3f5",
+        "sidebar_text": "#212529",
         "accent": "#007bff"
     },
     "Dunkel": {
@@ -24,6 +25,7 @@ THEMES = {
         "card_bg": "#262730",
         "text": "#fafafa",
         "sidebar": "#161b22",
+        "sidebar_text": "#fafafa",
         "accent": "#58a6ff"
     },
     "Kontrast": {
@@ -31,6 +33,7 @@ THEMES = {
         "card_bg": "#1a1a1a",
         "text": "#ffb86c",
         "sidebar": "#111111",
+        "sidebar_text": "#ffb86c",
         "accent": "#ffb86c"
     }
 }
@@ -88,7 +91,7 @@ with st.sidebar:
     sel_file = st.selectbox("Datei auswählen", quiz_structure[sel_cat])
     current_full_path = os.path.join("Quizzes", sel_cat, sel_file)
 
-    # Detektion von Quiz-Wechseln (Source of Truth Check)
+    # Detektion von Quiz-Wechseln
     if current_full_path != st.session_state.last_path:
         st.session_state.last_path = current_full_path
         raw_content = load_csv_data(current_full_path)
@@ -146,18 +149,25 @@ font_size = 20 * st.session_state.font_scale
 
 st.markdown(f"""
     <style>
-    /* Globales Layout & NotebookLM Ästhetik */
+    /* Globales Layout */
     .block-container {{
         background-color: {t['bg']};
         max-width: 900px;
         margin: auto;
         padding-top: 1.5rem !important;
-        padding-bottom: 6rem !important;
+        padding-bottom: 4rem !important;
         transition: all 0.3s ease;
     }}
 
+    /* Sidebar Fix für "Weiß auf Weiß" Probleme */
     [data-testid="stSidebar"] {{
-        background-color: {t['sidebar']};
+        background-color: {t['sidebar']} !important;
+    }}
+    [data-testid="stSidebar"] .stMarkdown,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] .stCaption,
+    [data-testid="stSidebar"] p {{
+        color: {t['sidebar_text']} !important;
     }}
 
     /* Die Flashcard */
@@ -197,11 +207,25 @@ st.markdown(f"""
 
     @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
 
-    /* RESPONSIVE DESIGN */
+    /* RESPONSIVE DESIGN - BREAKPOINTS */
+
+    /* Smartphones & kleine Tablets (Portrait) */
     @media (max-width: 640px) {{
         .block-container {{ padding: 1rem !important; }}
-        .flashcard {{ min-height: 280px; padding: 1.5rem; }}
+        .flashcard {{ min-height: 250px; padding: 1.5rem; }}
         .question-text {{ font-size: {font_size * 0.8}px; }}
+    }}
+
+    /* Tablets & Smartphones (LANDSCAPE - wichtig für "Bild zu groß") */
+    @media (max-height: 600px) and (orientation: landscape) {{
+        .flashcard {{
+            min-height: 180px !important;
+            padding: 1rem !important;
+            margin: 0.5rem 0 !important;
+        }}
+        .block-container {{ padding-top: 0.5rem !important; padding-bottom: 2rem !important; }}
+        .question-text {{ font-size: {font_size * 0.75}px; }}
+        .answer-box {{ margin-top: 0.5rem; padding: 0.8rem; }}
     }}
 
     /* UI Fixes */
@@ -221,7 +245,7 @@ clean_name = sel_file.replace('.csv', '')
 # Obere Statuszeile
 meta_col, next_col = st.columns([1, 1])
 with meta_col:
-    st.caption(f"Karte {st.session_state.idx + 1} von {total_cards} • {clean_name}")
+    st.caption(f"Karte {st.session_state.idx + 1}/{total_cards} • {clean_name}")
 with next_col:
     if st.button(f"Weiter ➡️", key="btn_next_top"):
         go_next()
